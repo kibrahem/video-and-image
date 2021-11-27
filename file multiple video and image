@@ -1,0 +1,159 @@
+  input type="file" (change)="onFileChange($event)"
+                multiple id="upload"
+                class="upload-box img__input" placeholder="ملف للخبر"
+                accept="image/* , video/*">
+                
+            <div class="post__images">
+              <div class="row__gallery">
+                <div class="col__gallery position-relative" *ngFor="let File of
+                  myFilesType; let i= index">
+                  <img [src]="File.name" alt *ngIf="File.type=='image'">
+                  <div *ngIf="File.type=='video'">
+                      <video  controls>
+                        <source [src]="File.name" type="">
+                      </video>
+                  </div>
+                  <div class="overlay" (click)="onDeleteFile(i)">
+                    <button (click)="onDeleteFile(i)"
+                      class="delete__img--gallery">
+                      <i class="fal fa-times-circle"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+  
+  myFiles: string[] = [];
+  myFilesType: any[] = [];
+
+  postForm = new FormGroup({
+    media: new FormControl('', []),
+  });
+  onFileChange(event: any) {
+    if (event.target.files && event.target.files[0]) {
+      for (var i = 0; i < event.target.files.length; i++) {
+        this.myFiles.push(event.target.files[i]);
+      }
+      console.log(this.myFiles);
+      var filesAmount = event.target.files.length;
+      for (let i = 0; i < filesAmount; i++) {
+        var reader = new FileReader();
+        reader.onload = (event: any) => {
+          if (event.target.result.search('data:image/') != -1) {
+            this.postForm.patchValue({
+              postType: 'Image',
+            });
+            this.myFilesType.push({ name: event.target.result, type: 'image' });
+          } else if (event.target.result.search('data:video/') != -1) {
+            this.postForm.patchValue({
+              postType: 'Video',
+            });
+            this.myFilesType.push({
+              name: (<FileReader>event.target).result,
+              type: 'video',
+            });
+          } else {
+            this.postForm.patchValue({
+              postType: 'Text',
+            });
+            this.myFilesType.push({ name: event.target.result, type: 'Text' });
+          }
+          this.postForm.patchValue({
+            media: this.myFiles,
+          });
+        };
+
+        reader.readAsDataURL(event.target.files[i]);
+      }
+    }
+    this.getTypeMedia();
+  }
+
+  onDeleteFile(id: any) {
+    this.myFiles.splice(id, 1);
+    this.myFilesType.splice(id, 1);
+    this.postForm.patchValue({
+      media: this.myFiles,
+    });
+    this.getTypeMedia();
+  }
+  addNewPost(transaction: string) {
+    this.getTypeMedia();
+
+    const formData = new FormData();
+    formData.append('postCategory', this.postForm.controls.postCategory.value);
+    formData.append('newsId', this.postForm.controls.newsId.value);
+    formData.append(
+      'socialAccountId',
+      this.postForm.controls.socialAccountId.value
+    );
+    formData.append('postType', this.postForm.controls.postType.value);
+    formData.append(
+      'postClassification',
+      this.postForm.controls.postClassification.value
+    );
+    formData.append('title', this.postForm.controls.title.value);
+    formData.append('description', this.postForm.controls.description.value);
+    formData.append('lang', this.postForm.controls.lang.value);
+    formData.append('link', this.postForm.controls.link.value);
+    for (var i = 0; i < this.myFiles.length; i++) {
+      formData.append('media', this.myFiles[i]);
+    }
+    //  formData.append('media[]', JSON.stringify(this.myFiles));
+    formData.append('media[]', JSON.stringify(this.myFiles));
+    this._PostService.addPost(transaction, formData).subscribe(
+      (data: any) => {
+        console.log(data.data);
+
+        if (data.error == null) {
+          this.postForm.reset();
+          this.show = true;
+
+          this._LanguageService.language$.subscribe((lang) => {
+            this.language_type = lang;
+          });
+          if (this.language_type == 'ar') {
+            this.message = data.message.ar;
+          } else {
+            this.message = data.message.en;
+          }
+          this.myFiles = [];
+          this.myFilesType = [];
+        } else {
+          console.log(data.error.ar, transaction);
+        }
+      },
+      (err) => {
+        console.log(err);
+      }
+    );
+  }
+  getTypeMedia() {
+    let hasVideo = '';
+    if (this.myFiles.length == 0) {
+      this.postForm.patchValue({
+        postType: 'Text',
+      });
+    } else {
+      this.myFilesType.forEach((element) => {
+        if (element.type == 'video') {
+          hasVideo = `Video`;
+        } else {
+          hasVideo = `Image`;
+        }
+      });
+    }
+    if (hasVideo == 'Video') {
+      this.postForm.patchValue({
+        postType: 'Video',
+      });
+    } else if (hasVideo == 'Image') {
+      this.postForm.patchValue({
+        postType: 'Image',
+      });
+    } else {
+      this.postForm.patchValue({
+        postType: 'Text',
+      });
+    }
+  }
